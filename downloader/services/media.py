@@ -10,7 +10,7 @@ from ..core import MediaResult, MediaStream, YtDlpExtractor
 class MediaExtractor(Protocol):
     """Protocol describing extractor implementations."""
 
-    def extract(self, url: str) -> Dict[str, Any]:
+    def extract(self, url: str, cookies: str | None = None) -> Dict[str, Any]:
         ...
 
 
@@ -20,10 +20,10 @@ class MediaService:
     def __init__(self, extractor: MediaExtractor | None = None) -> None:
         self._extractor: MediaExtractor = extractor or YtDlpExtractor()
 
-    def get_media(self, url: str) -> MediaResult:
+    def get_media(self, url: str, cookies: str | None = None) -> MediaResult:
         """Retrieve structured metadata for *url*."""
 
-        payload = self._extractor.extract(url)
+        payload = self._extractor.extract(url, cookies=cookies)
         formats = payload.get("formats") or []
 
         video_streams = list(self._build_streams(formats, kind="video"))

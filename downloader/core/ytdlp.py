@@ -5,7 +5,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from contextlib import suppress
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any, Dict, Iterable, List, Tuple
 import os
 import re
@@ -25,11 +27,33 @@ class YtDlpExtractor:
             options.get("extractor_args", {}),
         )
 
-    def extract(self, url: str) -> Dict[str, Any]:
+    def extract(self, url: str, cookies: str | None = None) -> Dict[str, Any]:
         """Fetch raw metadata for *url* using ``yt-dlp``."""
 
-        with YoutubeDL(self._options) as ydl:
-            return ydl.extract_info(url, download=False)
+        options = dict(self._options)
+        cookie_path: str | None = None
+
+        if cookies:
+            options.pop("cookiesfrombrowser", None)
+            options.pop("cookiefile", None)
+
+            temp_file = NamedTemporaryFile("w+", delete=False, encoding="utf-8")
+            try:
+                temp_file.write(cookies)
+                temp_file.flush()
+            finally:
+                temp_file.close()
+
+            cookie_path = temp_file.name
+            options["cookiefile"] = cookie_path
+
+        try:
+            with YoutubeDL(options) as ydl:
+                return ydl.extract_info(url, download=False)
+        finally:
+            if cookie_path:
+                with suppress(OSError):
+                    Path(cookie_path).unlink()
 
 
 def _without(mapping: Mapping[str, Any], *keys: str) -> Dict[str, Any]:
