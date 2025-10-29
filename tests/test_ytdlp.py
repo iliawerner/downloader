@@ -180,6 +180,33 @@ def test_extractor_uses_cookie_file_from_env(monkeypatch, tmp_path):
     assert "cookiesfrombrowser" not in captured["options"]
 
 
+def test_extractor_writes_cookie_content_to_tmp(monkeypatch):
+    captured = {}
+
+    def fake_youtubedl(options):
+        captured["options"] = options
+        return DummyYoutubeDL(options)
+
+    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+
+    tmp_cookie_path = Path("/tmp/cookies.txt")
+    if tmp_cookie_path.exists():
+        tmp_cookie_path.unlink()
+
+    monkeypatch.setenv("YT_DLP_COOKIES_CONTENT", "cookie-data=1")
+    monkeypatch.delenv("YT_DLP_COOKIES_FILE", raising=False)
+    monkeypatch.delenv("YT_DLP_COOKIES_FROM_BROWSER", raising=False)
+
+    extractor = YtDlpExtractor()
+    extractor.extract("https://example.com/content-cookies")
+
+    assert captured["options"].get("cookiefile") == str(tmp_cookie_path)
+    assert tmp_cookie_path.read_text(encoding="utf-8") == "cookie-data=1"
+
+    if tmp_cookie_path.exists():
+        tmp_cookie_path.unlink()
+
+
 def test_extractor_uses_browser_cookie_spec(monkeypatch):
     captured = {}
 
