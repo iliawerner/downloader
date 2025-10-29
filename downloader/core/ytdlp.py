@@ -74,6 +74,12 @@ def _build_default_options() -> Dict[str, Any]:
             "default": "-",
             "chapter": "-",
         },
+        # yt-dlp продолжит выполнять проверку и подбор форматов даже
+        # при ``download=False``. Чтобы этого избежать и не получать
+        # ``Requested format is not available`` при недоступности
+        # форматов, явно отключаем проверку и делаем ошибку мягкой.
+        "check_formats": False,
+        "ignore_no_formats_error": True,
         "extractor_args": extractor_args,
     }
 

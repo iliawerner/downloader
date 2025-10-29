@@ -47,7 +47,7 @@ def test_extractor_sets_expected_player_clients(monkeypatch):
     assert tab_args["player_client"] == youtube_args["player_client"]
 
 
-def test_extractor_requests_best_format_selector(monkeypatch):
+def test_extractor_disables_format_validation(monkeypatch):
     captured = {}
 
     def fake_youtubedl(options):
@@ -59,11 +59,14 @@ def test_extractor_requests_best_format_selector(monkeypatch):
     extractor = YtDlpExtractor()
     extractor.extract("https://example.com/no-format")
 
-    assert captured["options"].get("format") == "bestvideo*+bestaudio/best"
-    assert "listformats" not in captured["options"]
+    options = captured["options"]
+    assert options.get("format") is None
+    assert options.get("check_formats") is False
+    assert options.get("ignore_no_formats_error") is True
+    assert options.get("outtmpl") == {"default": "-", "chapter": "-"}
 
 
-def test_extractor_does_not_request_specific_format(monkeypatch):
+def test_extractor_has_no_format_parameter(monkeypatch):
     captured = {}
 
     def fake_youtubedl(options):
@@ -72,7 +75,7 @@ def test_extractor_does_not_request_specific_format(monkeypatch):
 
     monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
 
-    extractor = YtDlpExtractor(format="bestvideo*+bestaudio/best")
+    extractor = YtDlpExtractor()
     extractor.extract("https://example.com/no-format")
 
     assert "format" not in captured["options"]
