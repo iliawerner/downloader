@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Tuple
 import os
+import re
 
 from yt_dlp import YoutubeDL
+from yt_dlp.cookies import SUPPORTED_BROWSERS, SUPPORTED_KEYRINGS
 
 
 class YtDlpExtractor:
@@ -94,12 +96,16 @@ def _build_default_options() -> Dict[str, Any]:
         extractor_args["youtube"] = _clone_value(youtube_args)
         extractor_args["youtubetab"] = _clone_value(youtube_args)
 
-    return {
+    options: Dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
         "extractor_args": extractor_args,
     }
+
+    options.update(_cookies_options_from_env())
+
+    return options
 
 
 def _po_tokens_from_env() -> List[str]:
@@ -149,6 +155,58 @@ def _visitor_data_from_env() -> str | None:
     if visitor_data:
         visitor_data = visitor_data.strip()
     return visitor_data or None
+
+
+def _cookies_options_from_env() -> Dict[str, Any]:
+    options: Dict[str, Any] = {}
+
+    cookiefile = os.getenv("YT_DLP_COOKIES_FILE")
+    if cookiefile:
+        path = Path(cookiefile).expanduser()
+        if path.is_file():
+            options["cookiefile"] = str(path)
+
+    browser_spec = os.getenv("YT_DLP_COOKIES_FROM_BROWSER")
+    if browser_spec:
+        parsed = _parse_cookies_from_browser(browser_spec)
+        if parsed:
+            options["cookiesfrombrowser"] = parsed
+
+    return options
+
+
+_COOKIES_FROM_BROWSER_RE = re.compile(
+    r"""(?x)
+    (?P<name>[^+:]+)
+    (?:\s*\+\s*(?P<keyring>[^:]+))?
+    (?:\s*:\s*(?!:)(?P<profile>.+?))?
+    (?:\s*::\s*(?P<container>.+))?
+    """
+)
+
+
+def _parse_cookies_from_browser(value: str) -> Tuple[str, str | None, str | None, str | None] | None:
+    spec = value.strip()
+    if not spec:
+        return None
+
+    match = _COOKIES_FROM_BROWSER_RE.fullmatch(spec)
+    if not match:
+        return None
+
+    browser_name, keyring, profile, container = match.group(
+        "name", "keyring", "profile", "container"
+    )
+    browser_name = browser_name.lower()
+    if browser_name not in SUPPORTED_BROWSERS:
+        return None
+
+    if keyring is not None:
+        keyring = keyring.upper()
+        if keyring not in SUPPORTED_KEYRINGS:
+            return None
+
+    return browser_name, profile, keyring, container
 
 
 def _env_list(*names: str) -> List[str]:
