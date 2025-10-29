@@ -62,9 +62,6 @@ def _build_default_options() -> Dict[str, Any]:
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
-        # Request the best available combination while still exposing the
-        # full formats list. This mirrors yt-dlp's flexible default.
-        "format": "bestvideo*+bestaudio/best",
         "extractor_args": extractor_args,
     }
 
