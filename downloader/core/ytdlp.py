@@ -15,6 +15,8 @@ class YtDlpExtractor:
             "quiet": True,
             "no_warnings": True,
             "skip_download": True,
+            # Force Android client to avoid "confirm you're not a bot" blocks.
+            "extractor_args": {"youtube": {"player_client": ["android"]}},
         }
         self._options: Dict[str, Any] = {**defaults, **options}
 
