@@ -95,8 +95,10 @@ def _build_default_options() -> Dict[str, Any]:
         "youtubetab": _clone_value(youtube_args),
     }
 
-    # CRITICAL: Do NOT add a "format" key here. 
-    # The application is designed to list all available formats, not select one.
+    # CRITICAL: Do NOT add a "format" key here.
+    # The application must list all available formats rather than forcing
+    # ``bestvideo*+bestaudio``. Doing so triggers "Requested format is not
+    # available" errors on videos that do not expose those streams.
     options: Dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
