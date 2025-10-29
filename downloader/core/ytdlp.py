@@ -162,11 +162,12 @@ def _cookies_options_from_env() -> Dict[str, Any]:
 
     cookie_content = os.getenv("YT_DLP_COOKIES_CONTENT")
     if cookie_content:
+        normalized_content = _normalize_cookie_content(cookie_content)
         # Vercel provides a writable /tmp directory
         tmp_cookie_path = "/tmp/cookies.txt"
         try:
             with open(tmp_cookie_path, "w", encoding="utf-8") as f:
-                f.write(cookie_content)
+                f.write(normalized_content)
             options["cookiefile"] = tmp_cookie_path
         except OSError:
             # If writing fails, do nothing
@@ -186,6 +187,25 @@ def _cookies_options_from_env() -> Dict[str, Any]:
             options["cookiesfrombrowser"] = parsed
 
     return options
+
+
+def _normalize_cookie_content(raw: str) -> str:
+    """Coerce environment-provided cookie blobs into Netscape format."""
+
+    normalized = raw
+
+    if "\n" not in normalized and "\r" not in normalized:
+        if "\\r\\n" in normalized:
+            normalized = normalized.replace("\\r\\n", "\n")
+        elif "\\n" in normalized or "\\r" in normalized:
+            normalized = normalized.replace("\\n", "\n").replace("\\r", "\n")
+
+    normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
+
+    if normalized and not normalized.endswith("\n"):
+        normalized = f"{normalized}\n"
+
+    return normalized
 
 
 _COOKIES_FROM_BROWSER_RE = re.compile(

@@ -201,7 +201,40 @@ def test_extractor_writes_cookie_content_to_tmp(monkeypatch):
     extractor.extract("https://example.com/content-cookies")
 
     assert captured["options"].get("cookiefile") == str(tmp_cookie_path)
-    assert tmp_cookie_path.read_text(encoding="utf-8") == "cookie-data=1"
+    assert tmp_cookie_path.read_text(encoding="utf-8") == "cookie-data=1\n"
+
+    if tmp_cookie_path.exists():
+        tmp_cookie_path.unlink()
+
+
+def test_cookie_content_normalizes_escaped_newlines(monkeypatch):
+    captured = {}
+
+    def fake_youtubedl(options):
+        captured["options"] = options
+        return DummyYoutubeDL(options)
+
+    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+
+    tmp_cookie_path = Path("/tmp/cookies.txt")
+    if tmp_cookie_path.exists():
+        tmp_cookie_path.unlink()
+
+    monkeypatch.setenv(
+        "YT_DLP_COOKIES_CONTENT",
+        "# Netscape HTTP Cookie File\\n.example.com\tTRUE\t/\tFALSE\t0\tname\tvalue",
+    )
+    monkeypatch.delenv("YT_DLP_COOKIES_FILE", raising=False)
+    monkeypatch.delenv("YT_DLP_COOKIES_FROM_BROWSER", raising=False)
+
+    extractor = YtDlpExtractor()
+    extractor.extract("https://example.com/escaped-cookies")
+
+    assert captured["options"].get("cookiefile") == str(tmp_cookie_path)
+    assert (
+        tmp_cookie_path.read_text(encoding="utf-8")
+        == "# Netscape HTTP Cookie File\n.example.com\tTRUE\t/\tFALSE\t0\tname\tvalue\n"
+    )
 
     if tmp_cookie_path.exists():
         tmp_cookie_path.unlink()
