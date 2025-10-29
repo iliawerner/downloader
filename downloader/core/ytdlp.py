@@ -21,7 +21,15 @@ class YtDlpExtractor:
 
     def __init__(self, **options: Any) -> None:
         defaults: Dict[str, Any] = _build_default_options()
-        self._options: Dict[str, Any] = {**defaults, **_without(options, "extractor_args")}
+        # ``YoutubeDL``'s default ``format`` selects a single muxed stream.
+        # The application, however, must expose the raw ``formats`` list so the
+        # frontend can offer every available stream to the user.  Guard against
+        # any caller-provided ``format`` override by stripping it here.
+        self._options: Dict[str, Any] = {
+            **defaults,
+            **_without(options, "extractor_args", "format"),
+        }
+        self._options.pop("format", None)
         self._options["extractor_args"] = _merge_extractor_args(
             defaults.get("extractor_args", {}),
             options.get("extractor_args", {}),
@@ -95,8 +103,10 @@ def _build_default_options() -> Dict[str, Any]:
         "youtubetab": _clone_value(youtube_args),
     }
 
-    # CRITICAL: Do NOT add a "format" key here. 
-    # The application is designed to list all available formats, not select one.
+    # CRITICAL: Do NOT add a "format" key here.
+    # The application must list all available formats rather than forcing
+    # ``bestvideo*+bestaudio``. Doing so triggers "Requested format is not
+    # available" errors on videos that do not expose those streams.
     options: Dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
