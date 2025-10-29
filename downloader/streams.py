@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 from yt_dlp import YoutubeDL
 
@@ -16,8 +16,8 @@ class StreamInfo:
     mime_type: str
     resolution: str
     bitrate: str
-    fps: str | None
-    filesize: int | None
+    fps: Optional[str]
+    filesize: Optional[int]
     url: str
 
     @classmethod
