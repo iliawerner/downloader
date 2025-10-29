@@ -34,13 +34,20 @@ def test_extractor_forces_android_client(monkeypatch):
         return DummyYoutubeDL(options)
 
     monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+    monkeypatch.delenv("YT_DLP_PO_TOKEN", raising=False)
+    monkeypatch.delenv("YT_DLP_PO_TOKENS", raising=False)
+    monkeypatch.delenv("YT_DLP_PO_TOKEN_FILE", raising=False)
+    monkeypatch.delenv("YT_DLP_PLAYER_CLIENTS", raising=False)
+    monkeypatch.delenv("YT_DLP_PLAYER_CLIENT", raising=False)
+    monkeypatch.delenv("YT_DLP_VISITOR_DATA", raising=False)
 
     extractor = YtDlpExtractor()
     result = extractor.extract("https://example.com/video")
 
     assert result == {"id": "dummy"}
-    assert captured["options"]["extractor_args"]["youtube"]["player_client"] == ["android"]
-    assert captured["options"]["extractor_args"]["youtube"]["po_token"] == ["1"]
+    youtube_args = captured["options"]["extractor_args"]["youtube"]
+    assert youtube_args["player_client"] == ["android"]
+    assert "po_token" not in youtube_args
 
 
 def test_extract_uses_no_download(monkeypatch):
@@ -67,12 +74,17 @@ def test_extractor_preserves_custom_args(monkeypatch):
         return DummyYoutubeDL(options)
 
     monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+    monkeypatch.delenv("YT_DLP_PO_TOKEN", raising=False)
+    monkeypatch.delenv("YT_DLP_PO_TOKENS", raising=False)
+    monkeypatch.delenv("YT_DLP_PO_TOKEN_FILE", raising=False)
+    monkeypatch.delenv("YT_DLP_PLAYER_CLIENTS", raising=False)
+    monkeypatch.delenv("YT_DLP_PLAYER_CLIENT", raising=False)
+    monkeypatch.delenv("YT_DLP_VISITOR_DATA", raising=False)
 
     extractor = YtDlpExtractor(
         extractor_args={
             "youtube": {
                 "player_client": ["ios"],
-                "po_token": ["2"],
                 "custom_flag": ["value"],
             },
             "vimeo": {"foo": ["bar"]},
@@ -83,7 +95,31 @@ def test_extractor_preserves_custom_args(monkeypatch):
 
     youtube_args = captured["options"]["extractor_args"]["youtube"]
     assert youtube_args["player_client"] == ["android", "ios"]
-    assert youtube_args["po_token"] == ["1", "2"]
     assert youtube_args["custom_flag"] == ["value"]
 
     assert captured["options"]["extractor_args"]["vimeo"] == {"foo": ["bar"]}
+
+
+def test_extractor_uses_env_tokens(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_youtubedl(options):
+        captured["options"] = options
+        return DummyYoutubeDL(options)
+
+    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+
+    token_file = tmp_path / "tokens.txt"
+    token_file.write_text("file-token-1\nfile-token-2\n", encoding="utf-8")
+
+    monkeypatch.setenv("YT_DLP_PO_TOKEN", "env-token")
+    monkeypatch.setenv("YT_DLP_PO_TOKEN_FILE", str(token_file))
+    monkeypatch.delenv("YT_DLP_PLAYER_CLIENTS", raising=False)
+    monkeypatch.delenv("YT_DLP_PLAYER_CLIENT", raising=False)
+
+    extractor = YtDlpExtractor()
+    extractor.extract("https://example.com/with-token")
+
+    youtube_args = captured["options"]["extractor_args"]["youtube"]
+    assert youtube_args["player_client"] == ["mweb", "android"]
+    assert youtube_args["po_token"] == ["env-token", "file-token-1", "file-token-2"]
