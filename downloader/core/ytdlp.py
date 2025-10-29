@@ -1,3 +1,5 @@
+# downloader/core/ytdlp.py
+
 """Integration helpers for ``yt-dlp``."""
 
 from __future__ import annotations
@@ -46,26 +48,7 @@ def _merge_extractor_args(
     for extractor, args in overrides.items():
         target = merged.setdefault(extractor, {})
         for name, value in args.items():
-            if isinstance(value, list):
-                existing = list(target.get(name, [])) if isinstance(target.get(name), list) else []
-                for item in value:
-                    if item not in existing:
-                        existing.append(item)
-                target[name] = existing
-            else:
-                target[name] = value
-
-    if "youtube" in overrides and "youtubetab" not in overrides and "youtubetab" in merged:
-        tab_args = merged["youtubetab"]
-        for name, value in overrides["youtube"].items():
-            if isinstance(value, list):
-                existing = list(tab_args.get(name, [])) if isinstance(tab_args.get(name), list) else []
-                for item in value:
-                    if item not in existing:
-                        existing.append(item)
-                tab_args[name] = existing
-            else:
-                tab_args.setdefault(name, value)
+            target[name] = value
 
     return merged
 
@@ -80,22 +63,16 @@ def _clone_value(value: Any) -> Any:
 def _build_default_options() -> Dict[str, Any]:
     youtube_args: Dict[str, Any] = {}
 
-    po_tokens = _po_tokens_from_env()
-    player_clients = _player_clients_from_env(po_tokens)
-    visitor_data = _visitor_data_from_env()
+    player_clients = ["android_sdkless", "android", "android_vr", "ios", "tv", "mweb"]
+    youtube_args["player_client"] = player_clients
+    
+    extractor_args: Dict[str, Dict[str, Any]] = {
+        "youtube": _clone_value(youtube_args),
+        "youtubetab": _clone_value(youtube_args),
+    }
 
-    if player_clients:
-        youtube_args["player_client"] = player_clients
-    if po_tokens:
-        youtube_args["po_token"] = po_tokens
-    if visitor_data:
-        youtube_args["visitor_data"] = [visitor_data]
-
-    extractor_args: Dict[str, Dict[str, Any]] = {}
-    if youtube_args:
-        extractor_args["youtube"] = _clone_value(youtube_args)
-        extractor_args["youtubetab"] = _clone_value(youtube_args)
-
+    # CRITICAL: Do NOT add a "format" key here. 
+    # The application is designed to list all available formats, not select one.
     options: Dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
@@ -107,140 +84,42 @@ def _build_default_options() -> Dict[str, Any]:
 
     return options
 
-
-def _po_tokens_from_env() -> List[str]:
-    tokens = _env_list("YT_DLP_PO_TOKEN", "YT_DLP_PO_TOKENS")
-
-    file_tokens = _po_tokens_from_file(os.getenv("YT_DLP_PO_TOKEN_FILE"))
-    if file_tokens:
-        tokens.extend(file_tokens)
-
-    return _unique(tokens)
-
-
-def _po_tokens_from_file(path_str: str | None) -> List[str]:
-    if not path_str:
-        return []
-
-    path = Path(path_str).expanduser()
-    try:
-        contents = path.read_text(encoding="utf-8")
-    except OSError:
-        return []
-
-    return [line.strip() for line in contents.splitlines() if line.strip()]
-
-
-def _player_clients_from_env(po_tokens: Iterable[str]) -> List[str]:
-    explicit = _env_list("YT_DLP_PLAYER_CLIENTS", "YT_DLP_PLAYER_CLIENT")
-    if explicit:
-        return _unique(explicit)
-
-    baseline = [
-        "android_sdkless",
-        "android",
-        "android_vr",
-        "ios",
-        "tv",
-    ]
-    if list(po_tokens):
-        clients = ["mweb", *baseline]
-    else:
-        clients = baseline
-    return clients
-
-
-def _visitor_data_from_env() -> str | None:
-    visitor_data = os.getenv("YT_DLP_VISITOR_DATA")
-    if visitor_data:
-        visitor_data = visitor_data.strip()
-    return visitor_data or None
-
-
 def _cookies_options_from_env() -> Dict[str, Any]:
+    """
+    Builds cookie options, prioritizing Vercel's environment variable method.
+    """
     options: Dict[str, Any] = {}
-
+    
     cookie_content = os.getenv("YT_DLP_COOKIES_CONTENT")
     if cookie_content:
-        # Vercel provides a writable /tmp directory
+        # Vercel provides a writable /tmp directory. This is the primary method.
         tmp_cookie_path = "/tmp/cookies.txt"
         try:
             with open(tmp_cookie_path, "w", encoding="utf-8") as f:
                 f.write(cookie_content)
             options["cookiefile"] = tmp_cookie_path
+            # If this method succeeds, return immediately. Do not process other methods.
+            return options
         except OSError:
-            # If writing fails, do nothing
+            # If writing to /tmp fails, we'll fall through to other methods.
             pass
 
-    if "cookiefile" not in options:
-        cookiefile = os.getenv("YT_DLP_COOKIES_FILE")
-        if cookiefile:
-            path = Path(cookiefile).expanduser()
-            if path.is_file():
-                options["cookiefile"] = str(path)
-
+    # Fallback method 1: Read from a file path specified in an env var.
+    # Useful for local development, but not for Vercel's read-only filesystem.
+    cookiefile_path = os.getenv("YT_DLP_COOKIES_FILE")
+    if cookiefile_path:
+        path = Path(cookiefile_path).expanduser()
+        if path.is_file():
+            options["cookiefile"] = str(path)
+            return options
+            
+    # Fallback method 2: Use cookies directly from a local browser.
+    # Only for local development, will fail on Vercel.
     browser_spec = os.getenv("YT_DLP_COOKIES_FROM_BROWSER")
     if browser_spec:
-        parsed = _parse_cookies_from_browser(browser_spec)
-        if parsed:
-            options["cookiesfrombrowser"] = parsed
+        # This part of the original code for parsing browser spec is complex
+        # and not needed for the Vercel target. We simplify to a direct pass.
+        options["cookiesfrombrowser"] = tuple(part.strip() for part in browser_spec.split(':'))
+        return options
 
     return options
-
-
-_COOKIES_FROM_BROWSER_RE = re.compile(
-    r"""(?x)
-    (?P<name>[^+:]+)
-    (?:\s*\+\s*(?P<keyring>[^:]+))?
-    (?:\s*:\s*(?!:)(?P<profile>.+?))?
-    (?:\s*::\s*(?P<container>.+))?
-    """
-)
-
-
-def _parse_cookies_from_browser(value: str) -> Tuple[str, str | None, str | None, str | None] | None:
-    spec = value.strip()
-    if not spec:
-        return None
-
-    match = _COOKIES_FROM_BROWSER_RE.fullmatch(spec)
-    if not match:
-        return None
-
-    browser_name, keyring, profile, container = match.group(
-        "name", "keyring", "profile", "container"
-    )
-    browser_name = browser_name.lower()
-    if browser_name not in SUPPORTED_BROWSERS:
-        return None
-
-    if keyring is not None:
-        keyring = keyring.upper()
-        if keyring not in SUPPORTED_KEYRINGS:
-            return None
-
-    return browser_name, profile, keyring, container
-
-
-def _env_list(*names: str) -> List[str]:
-    values: List[str] = []
-    for name in names:
-        raw = os.getenv(name)
-        if not raw:
-            continue
-        parts = raw.split(",")
-        for part in parts:
-            item = part.strip()
-            if item:
-                values.append(item)
-    return values
-
-
-def _unique(values: Iterable[str]) -> List[str]:
-    seen: set[str] = set()
-    result: List[str] = []
-    for value in values:
-        if value not in seen:
-            seen.add(value)
-            result.append(value)
-    return result
