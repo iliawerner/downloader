@@ -25,3 +25,8 @@ class MediaSchema(BaseModel):
     audio_streams: list[StreamSchema]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MediaLookupRequest(BaseModel):
+    url: AnyHttpUrl
+    cookies: str | None = None

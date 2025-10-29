@@ -50,7 +50,8 @@ INDEX_HTML = """
         font-weight: 600;
         opacity: 0.85;
       }
-      input[type=\"url\"] {
+      input[type=\"url\"],
+      textarea {
         flex: 1;
         min-width: 280px;
         padding: 0.85rem 1rem;
@@ -60,7 +61,14 @@ INDEX_HTML = """
         color: inherit;
         font-size: 1rem;
       }
-      input[type=\"url\"]:focus {
+      textarea {
+        min-height: 140px;
+        width: 100%;
+        resize: vertical;
+        line-height: 1.4;
+      }
+      input[type=\"url\"]:focus,
+      textarea:focus {
         outline: none;
         border-color: #38bdf8;
         box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
@@ -137,8 +145,10 @@ INDEX_HTML = """
   <body>
     <main>
       <h1>YouTube Stream Inspector</h1>
-      <p>Paste a supported URL to list every available video resolution and standalone audio stream. The tool never downloads content; it only reveals direct CDN links provided by the platform.</p>
+      <p>Paste your freshest cookies and the video URL to list every available video resolution and standalone audio stream. The tool never downloads content; it only reveals direct CDN links provided by the platform.</p>
       <form id=\"lookup\">
+        <label for=\"cookies\">Cookies (optional)</label>
+        <textarea id=\"cookies\" name=\"cookies\" placeholder=\"# Netscape HTTP Cookie File\"></textarea>
         <label for=\"url\">Video URL</label>
         <input id=\"url\" name=\"url\" type=\"url\" placeholder=\"https://www.youtube.com/watch?v=...\" required />
         <button type=\"submit\">Inspect</button>
@@ -152,6 +162,7 @@ INDEX_HTML = """
     <script>
       const form = document.getElementById('lookup');
       const input = document.getElementById('url');
+      const cookiesInput = document.getElementById('cookies');
       const status = document.getElementById('status');
       const results = document.getElementById('results');
       const button = form.querySelector('button');
@@ -197,12 +208,18 @@ INDEX_HTML = """
         </article>`;
       }
 
-      async function lookup(url) {
+      async function lookup(url, cookies) {
         results.hidden = true;
         status.textContent = '';
         button.disabled = true;
         try {
-          const response = await fetch(`/api/streams?url=${encodeURIComponent(url)}`);
+          const response = await fetch('/api/streams', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url, cookies: cookies ?? null }),
+          });
           const payload = await response.json();
           if (!response.ok) {
             throw new Error(payload.detail || 'Lookup failed');
@@ -224,11 +241,12 @@ INDEX_HTML = """
       form.addEventListener('submit', (event) => {
         event.preventDefault();
         const url = input.value.trim();
+        const cookies = cookiesInput.value.trim();
         if (!url) {
           status.innerHTML = '<span class=\"error\">Please enter a URL.</span>';
           return;
         }
-        lookup(url);
+        lookup(url, cookies || null);
       });
     </script>
   </body>

@@ -180,6 +180,36 @@ def test_extractor_uses_cookie_file_from_env(monkeypatch, tmp_path):
     assert "cookiesfrombrowser" not in captured["options"]
 
 
+def test_extractor_uses_inline_cookies(monkeypatch):
+    captured = {}
+
+    class CookieAwareYoutubeDL(DummyYoutubeDL):
+        def extract_info(self, url, download):
+            cookiefile = self.params.get("cookiefile")
+            captured["cookiefile"] = cookiefile
+            if cookiefile:
+                path = Path(cookiefile)
+                captured["cookie_exists_during_call"] = path.is_file()
+                captured["cookie_content"] = path.read_text(encoding="utf-8")
+            return super().extract_info(url, download)
+
+    def fake_youtubedl(options):
+        captured["options"] = options
+        return CookieAwareYoutubeDL(options)
+
+    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+
+    extractor = YtDlpExtractor()
+    cookies = "# Netscape HTTP Cookie File\nfoo\tbar\n"
+    extractor.extract("https://example.com/inline-cookies", cookies=cookies)
+
+    cookiefile = captured.get("cookiefile")
+    assert cookiefile is not None
+    assert captured["cookie_exists_during_call"] is True
+    assert captured["cookie_content"] == cookies
+    assert not Path(cookiefile).exists()
+
+
 def test_extractor_uses_browser_cookie_spec(monkeypatch):
     captured = {}
 
