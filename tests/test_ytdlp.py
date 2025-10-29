@@ -40,6 +40,7 @@ def test_extractor_forces_android_client(monkeypatch):
 
     assert result == {"id": "dummy"}
     assert captured["options"]["extractor_args"]["youtube"]["player_client"] == ["android"]
+    assert captured["options"]["extractor_args"]["youtube"]["po_token"] == ["1"]
 
 
 def test_extract_uses_no_download(monkeypatch):
@@ -56,3 +57,33 @@ def test_extract_uses_no_download(monkeypatch):
 
     assert dummy.recorded_download is False
     assert dummy.recorded_url == "https://example.com/another"
+
+
+def test_extractor_preserves_custom_args(monkeypatch):
+    captured = {}
+
+    def fake_youtubedl(options):
+        captured["options"] = options
+        return DummyYoutubeDL(options)
+
+    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+
+    extractor = YtDlpExtractor(
+        extractor_args={
+            "youtube": {
+                "player_client": ["ios"],
+                "po_token": ["2"],
+                "custom_flag": ["value"],
+            },
+            "vimeo": {"foo": ["bar"]},
+        }
+    )
+
+    extractor.extract("https://example.com/merged")
+
+    youtube_args = captured["options"]["extractor_args"]["youtube"]
+    assert youtube_args["player_client"] == ["android", "ios"]
+    assert youtube_args["po_token"] == ["1", "2"]
+    assert youtube_args["custom_flag"] == ["value"]
+
+    assert captured["options"]["extractor_args"]["vimeo"] == {"foo": ["bar"]}
