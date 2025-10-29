@@ -42,6 +42,13 @@ class YtDlpExtractor:
         try:
             with YoutubeDL(options) as ydl:
                 return ydl.extract_info(url, download=False)
+        except Exception as exc:
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # Если возникает любая ошибка, добавляем к ней отладочную информацию
+            # о переданных опциях.
+            debug_info = f"DEBUG_INFO: Options passed to yt-dlp: {options}"
+            raise type(exc)(f"{str(exc)}\n\n{debug_info}") from exc
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
         finally:
             if cookie_path:
                 with suppress(OSError):
