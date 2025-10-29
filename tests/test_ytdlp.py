@@ -171,8 +171,6 @@ def test_extractor_uses_cookie_file_from_env(monkeypatch, tmp_path):
     cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
 
     monkeypatch.setenv("YT_DLP_COOKIES_FILE", str(cookie_file))
-    monkeypatch.delenv("YT_DLP_COOKIES_FROM_BROWSER", raising=False)
-
     extractor = YtDlpExtractor()
     extractor.extract("https://example.com/needs-cookies")
 
@@ -180,7 +178,7 @@ def test_extractor_uses_cookie_file_from_env(monkeypatch, tmp_path):
     assert "cookiesfrombrowser" not in captured["options"]
 
 
-def test_extractor_uses_browser_cookie_spec(monkeypatch):
+def test_extractor_ignores_browser_cookie_spec(monkeypatch):
     captured = {}
 
     def fake_youtubedl(options):
@@ -191,31 +189,10 @@ def test_extractor_uses_browser_cookie_spec(monkeypatch):
 
     monkeypatch.setenv("YT_DLP_COOKIES_FROM_BROWSER", "firefox:default::Research")
     monkeypatch.delenv("YT_DLP_COOKIES_FILE", raising=False)
+    monkeypatch.delenv("YT_DLP_COOKIES_CONTENT", raising=False)
 
     extractor = YtDlpExtractor()
     extractor.extract("https://example.com/browser-cookies")
 
-    assert captured["options"].get("cookiesfrombrowser") == (
-        "firefox",
-        "default",
-        None,
-        "Research",
-    )
-    assert "cookiefile" not in captured["options"]
-
-
-def test_extractor_ignores_invalid_browser_spec(monkeypatch):
-    captured = {}
-
-    def fake_youtubedl(options):
-        captured["options"] = options
-        return DummyYoutubeDL(options)
-
-    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
-
-    monkeypatch.setenv("YT_DLP_COOKIES_FROM_BROWSER", "unknownbrowser")
-
-    extractor = YtDlpExtractor()
-    extractor.extract("https://example.com/invalid-browser")
-
     assert "cookiesfrombrowser" not in captured["options"]
+    assert "cookiefile" not in captured["options"]
