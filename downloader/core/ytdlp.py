@@ -69,6 +69,7 @@ def _build_default_options() -> Dict[str, Any]:
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
+        "format": "bv*+ba/b",  # Гибкий селектор для получения всех данных
         # Используем явные шаблоны, чтобы yt-dlp не переключался в режим скачивания.
         "outtmpl": {
             "default": "-",
