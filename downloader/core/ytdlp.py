@@ -69,6 +69,7 @@ def _build_default_options() -> Dict[str, Any]:
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
+        "outtmpl": "-",  # Подавляет активацию селектора формата
         "extractor_args": extractor_args,
     }
 
