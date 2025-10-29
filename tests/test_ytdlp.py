@@ -47,9 +47,11 @@ def test_extractor_forces_android_client(monkeypatch):
     assert result == {"id": "dummy"}
     youtube_args = captured["options"]["extractor_args"]["youtube"]
     assert youtube_args["player_client"] == [
-        "android",
         "android_sdkless",
+        "android",
         "android_vr",
+        "ios",
+        "tv",
     ]
     assert "po_token" not in youtube_args
 
@@ -99,10 +101,11 @@ def test_extractor_preserves_custom_args(monkeypatch):
 
     youtube_args = captured["options"]["extractor_args"]["youtube"]
     assert youtube_args["player_client"] == [
-        "android",
         "android_sdkless",
+        "android",
         "android_vr",
         "ios",
+        "tv",
     ]
     assert youtube_args["custom_flag"] == ["value"]
 
@@ -132,8 +135,10 @@ def test_extractor_uses_env_tokens(monkeypatch, tmp_path):
     youtube_args = captured["options"]["extractor_args"]["youtube"]
     assert youtube_args["player_client"] == [
         "mweb",
-        "android",
         "android_sdkless",
+        "android",
         "android_vr",
+        "ios",
+        "tv",
     ]
     assert youtube_args["po_token"] == ["env-token", "file-token-1", "file-token-2"]

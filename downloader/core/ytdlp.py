@@ -115,7 +115,13 @@ def _player_clients_from_env(po_tokens: Iterable[str]) -> List[str]:
     if explicit:
         return _unique(explicit)
 
-    baseline = ["android", "android_sdkless", "android_vr"]
+    baseline = [
+        "android_sdkless",
+        "android",
+        "android_vr",
+        "ios",
+        "tv",
+    ]
     if list(po_tokens):
         clients = ["mweb", *baseline]
     else:
