@@ -41,7 +41,12 @@ class YtDlpExtractor:
 
         try:
             with YoutubeDL(options) as ydl:
-                return ydl.extract_info(url, download=False, process=False)
+                # ``process=True`` (the default) is required so yt-dlp performs the
+                # full extraction pipeline which populates the ``formats`` list with
+                # direct stream URLs. Skipping the processing step yields minimal
+                # metadata without usable download links, which results in empty
+                # stream tables on the frontend.
+                return ydl.extract_info(url, download=False)
         except Exception as exc:
             # --- НАЧАЛО ИЗМЕНЕНИЙ ---
             # Если возникает любая ошибка, добавляем к ней отладочную информацию

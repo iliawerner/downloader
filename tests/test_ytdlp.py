@@ -70,9 +70,9 @@ def test_extractor_requests_raw_metadata(monkeypatch):
     assert "ignore_no_formats_error" not in options
     assert options.get("extractor_args") is not None
 
-    # ``process=False`` гарантирует, что yt-dlp не будет выполнять подбор форматов,
-    # благодаря чему возвращается полный список потоков.
-    assert captured["instance"].recorded_process is False
+    # yt-dlp must run its full processing pipeline so the ``formats`` entries
+    # contain direct stream URLs that can be rendered in the UI.
+    assert captured["instance"].recorded_process is True
 
 
 
