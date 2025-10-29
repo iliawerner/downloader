@@ -13,6 +13,7 @@ class DummyYoutubeDL:
         self.params = params
         self.recorded_url = None
         self.recorded_download = None
+        self.recorded_process = None
 
     def __enter__(self):
         return self
@@ -20,9 +21,10 @@ class DummyYoutubeDL:
     def __exit__(self, exc_type, exc, tb):
         return False
 
-    def extract_info(self, url, download):
+    def extract_info(self, url, download, *, process=True, **kwargs):
         self.recorded_url = url
         self.recorded_download = download
+        self.recorded_process = process
         return {"id": "dummy"}
 
 
@@ -47,7 +49,34 @@ def test_extractor_sets_expected_player_clients(monkeypatch):
     assert tab_args["player_client"] == youtube_args["player_client"]
 
 
-def test_extractor_requests_best_format_selector(monkeypatch):
+def test_extractor_requests_raw_metadata(monkeypatch):
+    captured = {}
+
+    def fake_youtubedl(options):
+        dummy = DummyYoutubeDL(options)
+        captured["options"] = options
+        captured["instance"] = dummy
+        return dummy
+
+    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+
+    extractor = YtDlpExtractor()
+    extractor.extract("https://example.com/no-format")
+
+    options = captured["options"]
+    assert options.get("outtmpl") == {"default": "-", "chapter": "-"}
+    assert options.get("format") is None
+    assert "check_formats" not in options
+    assert "ignore_no_formats_error" not in options
+    assert options.get("extractor_args") is not None
+
+    # ``process=False`` гарантирует, что yt-dlp не будет выполнять подбор форматов,
+    # благодаря чему возвращается полный список потоков.
+    assert captured["instance"].recorded_process is False
+
+
+
+def test_extractor_has_no_format_parameter(monkeypatch):
     captured = {}
 
     def fake_youtubedl(options):
@@ -57,22 +86,6 @@ def test_extractor_requests_best_format_selector(monkeypatch):
     monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
 
     extractor = YtDlpExtractor()
-    extractor.extract("https://example.com/no-format")
-
-    assert captured["options"].get("format") == "bestvideo*+bestaudio/best"
-    assert "listformats" not in captured["options"]
-
-
-def test_extractor_does_not_request_specific_format(monkeypatch):
-    captured = {}
-
-    def fake_youtubedl(options):
-        captured["options"] = options
-        return DummyYoutubeDL(options)
-
-    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
-
-    extractor = YtDlpExtractor(format="bestvideo*+bestaudio/best")
     extractor.extract("https://example.com/no-format")
 
     assert "format" not in captured["options"]
@@ -98,14 +111,14 @@ def test_extractor_uses_inline_cookies(monkeypatch):
     captured = {}
 
     class CookieAwareYoutubeDL(DummyYoutubeDL):
-        def extract_info(self, url, download):
+        def extract_info(self, url, download, *, process=True, **kwargs):
             cookiefile = self.params.get("cookiefile")
             captured["cookiefile"] = cookiefile
             if cookiefile:
                 path = Path(cookiefile)
                 captured["cookie_exists_during_call"] = path.is_file()
                 captured["cookie_content"] = path.read_text(encoding="utf-8")
-            return super().extract_info(url, download)
+            return super().extract_info(url, download, process=process, **kwargs)
 
     def fake_youtubedl(options):
         captured["options"] = options
