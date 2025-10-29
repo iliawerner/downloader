@@ -108,6 +108,19 @@ INDEX_HTML = """
         border: 1px solid rgba(148, 163, 184, 0.2);
         padding: 1.5rem;
       }
+      .logs {
+        margin-top: 1.5rem;
+      }
+      .logs pre {
+        background: rgba(15, 23, 42, 0.55);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        max-height: 320px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
       .streams {
         overflow-x: auto;
       }
@@ -155,6 +168,10 @@ INDEX_HTML = """
       </form>
       <p class=\"status\" id=\"status\"></p>
       <section class=\"cards\" id=\"results\" hidden></section>
+      <section class=\"card logs\" id=\"logs\" hidden>
+        <h2>Debug Log</h2>
+        <pre id=\"logs-content\"></pre>
+      </section>
       <footer>
         Built for research purposes with <code>yt-dlp</code>. Please respect copyright and platform terms of service.
       </footer>
@@ -166,6 +183,23 @@ INDEX_HTML = """
       const status = document.getElementById('status');
       const results = document.getElementById('results');
       const button = form.querySelector('button');
+      const logPanel = document.getElementById('logs');
+      const logContent = document.getElementById('logs-content');
+
+      function resetLogs() {
+        logContent.textContent = '';
+        logPanel.hidden = false;
+      }
+
+      function appendLog(message, details) {
+        const timestamp = new Date().toISOString();
+        logContent.textContent += `[${timestamp}] ${message}`;
+        if (details) {
+          const formatted = typeof details === 'string' ? details : JSON.stringify(details, null, 2);
+          logContent.textContent += `\n${formatted}`;
+        }
+        logContent.textContent += '\n\n';
+      }
 
       function escapeHtml(value) {
         return value.replace(/[&<>\"']/g, (char) => ({
@@ -212,15 +246,27 @@ INDEX_HTML = """
         results.hidden = true;
         status.textContent = '';
         button.disabled = true;
+        resetLogs();
         try {
+          const requestBody = { url, cookies: cookies ?? null };
+          appendLog('Sending POST /api/streams request', requestBody);
           const response = await fetch('/api/streams', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ url, cookies: cookies ?? null }),
+            body: JSON.stringify(requestBody),
           });
-          const payload = await response.json();
+          appendLog(`Received response ${response.status} ${response.statusText}`);
+          const responseText = await response.text();
+          appendLog('Raw response body', responseText || '<empty>');
+          let payload;
+          try {
+            payload = responseText ? JSON.parse(responseText) : {};
+          } catch (parseError) {
+            appendLog('Response JSON parse error', String(parseError));
+            throw new Error('Failed to parse response JSON');
+          }
           if (!response.ok) {
             throw new Error(payload.detail || 'Lookup failed');
           }
@@ -232,6 +278,7 @@ INDEX_HTML = """
           results.innerHTML = cards.join('');
           results.hidden = false;
         } catch (error) {
+          appendLog('Lookup failed', error?.message || String(error));
           status.innerHTML = `<span class=\"error\">${escapeHtml(error.message || 'Unexpected error')}</span>`;
         } finally {
           button.disabled = false;
