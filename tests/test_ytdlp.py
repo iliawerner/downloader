@@ -46,7 +46,11 @@ def test_extractor_forces_android_client(monkeypatch):
 
     assert result == {"id": "dummy"}
     youtube_args = captured["options"]["extractor_args"]["youtube"]
-    assert youtube_args["player_client"] == ["android"]
+    assert youtube_args["player_client"] == [
+        "android",
+        "android_sdkless",
+        "android_vr",
+    ]
     assert "po_token" not in youtube_args
 
 
@@ -94,7 +98,12 @@ def test_extractor_preserves_custom_args(monkeypatch):
     extractor.extract("https://example.com/merged")
 
     youtube_args = captured["options"]["extractor_args"]["youtube"]
-    assert youtube_args["player_client"] == ["android", "ios"]
+    assert youtube_args["player_client"] == [
+        "android",
+        "android_sdkless",
+        "android_vr",
+        "ios",
+    ]
     assert youtube_args["custom_flag"] == ["value"]
 
     assert captured["options"]["extractor_args"]["vimeo"] == {"foo": ["bar"]}
@@ -121,5 +130,10 @@ def test_extractor_uses_env_tokens(monkeypatch, tmp_path):
     extractor.extract("https://example.com/with-token")
 
     youtube_args = captured["options"]["extractor_args"]["youtube"]
-    assert youtube_args["player_client"] == ["mweb", "android"]
+    assert youtube_args["player_client"] == [
+        "mweb",
+        "android",
+        "android_sdkless",
+        "android_vr",
+    ]
     assert youtube_args["po_token"] == ["env-token", "file-token-1", "file-token-2"]
