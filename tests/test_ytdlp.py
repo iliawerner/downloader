@@ -66,6 +66,7 @@ def test_extractor_requests_raw_metadata(monkeypatch):
     options = captured["options"]
     assert "outtmpl" not in options
     assert options.get("format") is None
+    assert options.get("ignoreconfig") is True
     assert "check_formats" not in options
     assert "ignore_no_formats_error" not in options
     assert options.get("extractor_args") is not None

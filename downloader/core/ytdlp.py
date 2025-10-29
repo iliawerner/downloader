@@ -74,6 +74,12 @@ def _build_default_options() -> Dict[str, Any]:
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
+        # ``ignoreconfig`` disables reading the user's yt-dlp configuration
+        # files.  When third-party configs provide values such as ``format`` or
+        # ``outtmpl`` they can constrain the available streams or cause empty
+        # results in metadata mode.  Explicitly opting out keeps the extractor
+        # deterministic regardless of the deployment environment.
+        "ignoreconfig": True,
         # ``extract_info`` без ``process`` возвращает метаданные для *всех* потоков.
         # Чтобы не ограничивать выдачу и не скрыть доступные потоки, формат не
         # задаётся явно. Это гарантирует, что интерфейс увидит полный список
