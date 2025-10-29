@@ -16,7 +16,7 @@ class YtDlpExtractor:
     """Thin wrapper around :class:`yt_dlp.YoutubeDL`."""
 
     def __init__(self) -> None:
-        """Initializes the extractor with default, non-selecting options."""
+        """Initializes the extractor with default options."""
         self._options: Dict[str, Any] = _build_default_options()
 
     def extract(self, url: str, cookies: str | None = None) -> Dict[str, Any]:
@@ -58,15 +58,13 @@ def _build_default_options() -> Dict[str, Any]:
         "youtubetab": {"player_client": player_clients},
     }
 
-    # CRITICAL FIX:
-    # "listformats: True" forces yt-dlp to return all available formats
-    # instead of trying to select a default one (which causes the error).
-    # "format" key MUST NOT be present.
     options: Dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
-        "listformats": True,  # This is the definitive fix.
+        # Request the best available combination while still exposing the
+        # full formats list. This mirrors yt-dlp's flexible default.
+        "format": "bestvideo*+bestaudio/best",
         "extractor_args": extractor_args,
     }
 

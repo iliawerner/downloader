@@ -47,7 +47,7 @@ def test_extractor_sets_expected_player_clients(monkeypatch):
     assert tab_args["player_client"] == youtube_args["player_client"]
 
 
-def test_extractor_requests_listformats(monkeypatch):
+def test_extractor_requests_best_format_selector(monkeypatch):
     captured = {}
 
     def fake_youtubedl(options):
@@ -59,8 +59,8 @@ def test_extractor_requests_listformats(monkeypatch):
     extractor = YtDlpExtractor()
     extractor.extract("https://example.com/no-format")
 
-    assert captured["options"].get("listformats") is True
-    assert "format" not in captured["options"]
+    assert captured["options"].get("format") == "bestvideo*+bestaudio/best"
+    assert "listformats" not in captured["options"]
 
 
 def test_extract_uses_no_download(monkeypatch):
