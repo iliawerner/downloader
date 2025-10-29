@@ -160,11 +160,24 @@ def _visitor_data_from_env() -> str | None:
 def _cookies_options_from_env() -> Dict[str, Any]:
     options: Dict[str, Any] = {}
 
-    cookiefile = os.getenv("YT_DLP_COOKIES_FILE")
-    if cookiefile:
-        path = Path(cookiefile).expanduser()
-        if path.is_file():
-            options["cookiefile"] = str(path)
+    cookie_content = os.getenv("YT_DLP_COOKIES_CONTENT")
+    if cookie_content:
+        # Vercel provides a writable /tmp directory
+        tmp_cookie_path = "/tmp/cookies.txt"
+        try:
+            with open(tmp_cookie_path, "w", encoding="utf-8") as f:
+                f.write(cookie_content)
+            options["cookiefile"] = tmp_cookie_path
+        except OSError:
+            # If writing fails, do nothing
+            pass
+
+    if "cookiefile" not in options:
+        cookiefile = os.getenv("YT_DLP_COOKIES_FILE")
+        if cookiefile:
+            path = Path(cookiefile).expanduser()
+            if path.is_file():
+                options["cookiefile"] = str(path)
 
     browser_spec = os.getenv("YT_DLP_COOKIES_FROM_BROWSER")
     if browser_spec:
