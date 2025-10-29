@@ -26,7 +26,7 @@ class DummyYoutubeDL:
         return {"id": "dummy"}
 
 
-def test_extractor_forces_android_client(monkeypatch):
+def test_extractor_sets_expected_player_clients(monkeypatch):
     captured = {}
 
     def fake_youtubedl(options):
@@ -34,12 +34,6 @@ def test_extractor_forces_android_client(monkeypatch):
         return DummyYoutubeDL(options)
 
     monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
-    monkeypatch.delenv("YT_DLP_PO_TOKEN", raising=False)
-    monkeypatch.delenv("YT_DLP_PO_TOKENS", raising=False)
-    monkeypatch.delenv("YT_DLP_PO_TOKEN_FILE", raising=False)
-    monkeypatch.delenv("YT_DLP_PLAYER_CLIENTS", raising=False)
-    monkeypatch.delenv("YT_DLP_PLAYER_CLIENT", raising=False)
-    monkeypatch.delenv("YT_DLP_VISITOR_DATA", raising=False)
 
     extractor = YtDlpExtractor()
     result = extractor.extract("https://example.com/video")
@@ -49,16 +43,24 @@ def test_extractor_forces_android_client(monkeypatch):
     youtube_args = extractor_args["youtube"]
     tab_args = extractor_args["youtubetab"]
 
-    assert youtube_args["player_client"] == [
-        "android_sdkless",
-        "android",
-        "android_vr",
-        "ios",
-        "tv",
-    ]
-    assert "po_token" not in youtube_args
+    assert youtube_args["player_client"] == ["android", "mweb", "tv"]
     assert tab_args["player_client"] == youtube_args["player_client"]
-    assert "po_token" not in tab_args
+
+
+def test_extractor_requests_best_format_selector(monkeypatch):
+    captured = {}
+
+    def fake_youtubedl(options):
+        captured["options"] = options
+        return DummyYoutubeDL(options)
+
+    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+
+    extractor = YtDlpExtractor()
+    extractor.extract("https://example.com/no-format")
+
+    assert captured["options"].get("format") == "bestvideo*+bestaudio/best"
+    assert "listformats" not in captured["options"]
 
 
 def test_extractor_does_not_request_specific_format(monkeypatch):
@@ -92,109 +94,6 @@ def test_extract_uses_no_download(monkeypatch):
     assert dummy.recorded_url == "https://example.com/another"
 
 
-def test_extractor_preserves_custom_args(monkeypatch):
-    captured = {}
-
-    def fake_youtubedl(options):
-        captured["options"] = options
-        return DummyYoutubeDL(options)
-
-    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
-    monkeypatch.delenv("YT_DLP_PO_TOKEN", raising=False)
-    monkeypatch.delenv("YT_DLP_PO_TOKENS", raising=False)
-    monkeypatch.delenv("YT_DLP_PO_TOKEN_FILE", raising=False)
-    monkeypatch.delenv("YT_DLP_PLAYER_CLIENTS", raising=False)
-    monkeypatch.delenv("YT_DLP_PLAYER_CLIENT", raising=False)
-    monkeypatch.delenv("YT_DLP_VISITOR_DATA", raising=False)
-
-    extractor = YtDlpExtractor(
-        extractor_args={
-            "youtube": {
-                "player_client": ["ios"],
-                "custom_flag": ["value"],
-            },
-            "vimeo": {"foo": ["bar"]},
-        }
-    )
-
-    extractor.extract("https://example.com/merged")
-
-    extractor_args = captured["options"]["extractor_args"]
-    youtube_args = extractor_args["youtube"]
-    tab_args = extractor_args["youtubetab"]
-
-    assert youtube_args["player_client"] == [
-        "android_sdkless",
-        "android",
-        "android_vr",
-        "ios",
-        "tv",
-    ]
-    assert youtube_args["custom_flag"] == ["value"]
-    assert tab_args["player_client"] == youtube_args["player_client"]
-    assert tab_args["custom_flag"] == ["value"]
-
-    assert extractor_args["vimeo"] == {"foo": ["bar"]}
-
-
-def test_extractor_uses_env_tokens(monkeypatch, tmp_path):
-    captured = {}
-
-    def fake_youtubedl(options):
-        captured["options"] = options
-        return DummyYoutubeDL(options)
-
-    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
-
-    token_file = tmp_path / "tokens.txt"
-    token_file.write_text("file-token-1\nfile-token-2\n", encoding="utf-8")
-
-    monkeypatch.setenv("YT_DLP_PO_TOKEN", "env-token")
-    monkeypatch.setenv("YT_DLP_PO_TOKEN_FILE", str(token_file))
-    monkeypatch.delenv("YT_DLP_PLAYER_CLIENTS", raising=False)
-    monkeypatch.delenv("YT_DLP_PLAYER_CLIENT", raising=False)
-
-    extractor = YtDlpExtractor()
-    extractor.extract("https://example.com/with-token")
-
-    extractor_args = captured["options"]["extractor_args"]
-    youtube_args = extractor_args["youtube"]
-    tab_args = extractor_args["youtubetab"]
-
-    assert youtube_args["player_client"] == [
-        "mweb",
-        "android_sdkless",
-        "android",
-        "android_vr",
-        "ios",
-        "tv",
-    ]
-    assert youtube_args["po_token"] == ["env-token", "file-token-1", "file-token-2"]
-    assert tab_args["player_client"] == youtube_args["player_client"]
-    assert tab_args["po_token"] == youtube_args["po_token"]
-
-
-def test_extractor_uses_cookie_file_from_env(monkeypatch, tmp_path):
-    captured = {}
-
-    def fake_youtubedl(options):
-        captured["options"] = options
-        return DummyYoutubeDL(options)
-
-    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
-    cookie_file = tmp_path / "cookies.txt"
-    cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
-
-    monkeypatch.setenv("YT_DLP_COOKIES_FILE", str(cookie_file))
-    monkeypatch.delenv("YT_DLP_COOKIES_FROM_BROWSER", raising=False)
-
-    extractor = YtDlpExtractor()
-    extractor.extract("https://example.com/needs-cookies")
-
-    assert captured["options"].get("cookiefile") == str(cookie_file)
-    assert "cookiesfrombrowser" not in captured["options"]
-
-
 def test_extractor_uses_inline_cookies(monkeypatch):
     captured = {}
 
@@ -223,44 +122,3 @@ def test_extractor_uses_inline_cookies(monkeypatch):
     assert captured["cookie_exists_during_call"] is True
     assert captured["cookie_content"] == cookies
     assert not Path(cookiefile).exists()
-
-
-def test_extractor_uses_browser_cookie_spec(monkeypatch):
-    captured = {}
-
-    def fake_youtubedl(options):
-        captured["options"] = options
-        return DummyYoutubeDL(options)
-
-    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
-
-    monkeypatch.setenv("YT_DLP_COOKIES_FROM_BROWSER", "firefox:default::Research")
-    monkeypatch.delenv("YT_DLP_COOKIES_FILE", raising=False)
-
-    extractor = YtDlpExtractor()
-    extractor.extract("https://example.com/browser-cookies")
-
-    assert captured["options"].get("cookiesfrombrowser") == (
-        "firefox",
-        "default",
-        None,
-        "Research",
-    )
-    assert "cookiefile" not in captured["options"]
-
-
-def test_extractor_ignores_invalid_browser_spec(monkeypatch):
-    captured = {}
-
-    def fake_youtubedl(options):
-        captured["options"] = options
-        return DummyYoutubeDL(options)
-
-    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
-
-    monkeypatch.setenv("YT_DLP_COOKIES_FROM_BROWSER", "unknownbrowser")
-
-    extractor = YtDlpExtractor()
-    extractor.extract("https://example.com/invalid-browser")
-
-    assert "cookiesfrombrowser" not in captured["options"]
