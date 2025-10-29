@@ -64,7 +64,7 @@ def test_extractor_requests_raw_metadata(monkeypatch):
     extractor.extract("https://example.com/no-format")
 
     options = captured["options"]
-    assert options.get("outtmpl") == {"default": "-", "chapter": "-"}
+    assert "outtmpl" not in options
     assert options.get("format") is None
     assert "check_formats" not in options
     assert "ignore_no_formats_error" not in options
