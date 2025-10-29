@@ -64,7 +64,10 @@ def _build_default_options() -> Dict[str, Any]:
     """Builds the base dictionary of options for yt-dlp."""
 
     # Use a variety of clients to mimic real devices, reducing the chance of blocks.
-    player_clients = ["android", "mweb", "tv"]
+    # The "web" client must be included so yt-dlp can retrieve the JavaScript
+    # player needed to decipher signature ciphers and expose direct stream URLs.
+    # Without it, some videos only return metadata without populated ``formats``.
+    player_clients = ["web", "android", "mweb", "tv"]
     extractor_args: Dict[str, Dict[str, Any]] = {
         "youtube": {"player_client": player_clients},
         "youtubetab": {"player_client": player_clients},

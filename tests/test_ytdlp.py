@@ -45,7 +45,7 @@ def test_extractor_sets_expected_player_clients(monkeypatch):
     youtube_args = extractor_args["youtube"]
     tab_args = extractor_args["youtubetab"]
 
-    assert youtube_args["player_client"] == ["android", "mweb", "tv"]
+    assert youtube_args["player_client"] == ["web", "android", "mweb", "tv"]
     assert tab_args["player_client"] == youtube_args["player_client"]
 
 
