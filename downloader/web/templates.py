@@ -198,7 +198,7 @@ INDEX_HTML = """
           const formatted = typeof details === 'string' ? details : JSON.stringify(details, null, 2);
           logContent.textContent += `\n${formatted}`;
         }
-        logContent.textContent += '\n\n';
+        logContent.textContent += '\\n\\n';
       }
 
       function escapeHtml(value) {
