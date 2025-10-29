@@ -63,6 +63,21 @@ def test_extractor_requests_best_format_selector(monkeypatch):
     assert "listformats" not in captured["options"]
 
 
+def test_extractor_does_not_request_specific_format(monkeypatch):
+    captured = {}
+
+    def fake_youtubedl(options):
+        captured["options"] = options
+        return DummyYoutubeDL(options)
+
+    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+
+    extractor = YtDlpExtractor(format="bestvideo*+bestaudio/best")
+    extractor.extract("https://example.com/no-format")
+
+    assert "format" not in captured["options"]
+
+
 def test_extract_uses_no_download(monkeypatch):
     dummy = DummyYoutubeDL({})
 
