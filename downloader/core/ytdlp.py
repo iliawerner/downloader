@@ -53,6 +53,18 @@ def _merge_extractor_args(
             else:
                 target[name] = value
 
+    if "youtube" in overrides and "youtubetab" not in overrides and "youtubetab" in merged:
+        tab_args = merged["youtubetab"]
+        for name, value in overrides["youtube"].items():
+            if isinstance(value, list):
+                existing = list(tab_args.get(name, [])) if isinstance(tab_args.get(name), list) else []
+                for item in value:
+                    if item not in existing:
+                        existing.append(item)
+                tab_args[name] = existing
+            else:
+                tab_args.setdefault(name, value)
+
     return merged
 
 
@@ -77,7 +89,10 @@ def _build_default_options() -> Dict[str, Any]:
     if visitor_data:
         youtube_args["visitor_data"] = [visitor_data]
 
-    extractor_args = {"youtube": youtube_args} if youtube_args else {}
+    extractor_args: Dict[str, Dict[str, Any]] = {}
+    if youtube_args:
+        extractor_args["youtube"] = _clone_value(youtube_args)
+        extractor_args["youtubetab"] = _clone_value(youtube_args)
 
     return {
         "quiet": True,

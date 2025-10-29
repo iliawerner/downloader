@@ -45,7 +45,10 @@ def test_extractor_forces_android_client(monkeypatch):
     result = extractor.extract("https://example.com/video")
 
     assert result == {"id": "dummy"}
-    youtube_args = captured["options"]["extractor_args"]["youtube"]
+    extractor_args = captured["options"]["extractor_args"]
+    youtube_args = extractor_args["youtube"]
+    tab_args = extractor_args["youtubetab"]
+
     assert youtube_args["player_client"] == [
         "android_sdkless",
         "android",
@@ -54,6 +57,8 @@ def test_extractor_forces_android_client(monkeypatch):
         "tv",
     ]
     assert "po_token" not in youtube_args
+    assert tab_args["player_client"] == youtube_args["player_client"]
+    assert "po_token" not in tab_args
 
 
 def test_extract_uses_no_download(monkeypatch):
@@ -99,7 +104,10 @@ def test_extractor_preserves_custom_args(monkeypatch):
 
     extractor.extract("https://example.com/merged")
 
-    youtube_args = captured["options"]["extractor_args"]["youtube"]
+    extractor_args = captured["options"]["extractor_args"]
+    youtube_args = extractor_args["youtube"]
+    tab_args = extractor_args["youtubetab"]
+
     assert youtube_args["player_client"] == [
         "android_sdkless",
         "android",
@@ -108,8 +116,10 @@ def test_extractor_preserves_custom_args(monkeypatch):
         "tv",
     ]
     assert youtube_args["custom_flag"] == ["value"]
+    assert tab_args["player_client"] == youtube_args["player_client"]
+    assert tab_args["custom_flag"] == ["value"]
 
-    assert captured["options"]["extractor_args"]["vimeo"] == {"foo": ["bar"]}
+    assert extractor_args["vimeo"] == {"foo": ["bar"]}
 
 
 def test_extractor_uses_env_tokens(monkeypatch, tmp_path):
@@ -132,7 +142,10 @@ def test_extractor_uses_env_tokens(monkeypatch, tmp_path):
     extractor = YtDlpExtractor()
     extractor.extract("https://example.com/with-token")
 
-    youtube_args = captured["options"]["extractor_args"]["youtube"]
+    extractor_args = captured["options"]["extractor_args"]
+    youtube_args = extractor_args["youtube"]
+    tab_args = extractor_args["youtubetab"]
+
     assert youtube_args["player_client"] == [
         "mweb",
         "android_sdkless",
@@ -142,3 +155,5 @@ def test_extractor_uses_env_tokens(monkeypatch, tmp_path):
         "tv",
     ]
     assert youtube_args["po_token"] == ["env-token", "file-token-1", "file-token-2"]
+    assert tab_args["player_client"] == youtube_args["player_client"]
+    assert tab_args["po_token"] == youtube_args["po_token"]
