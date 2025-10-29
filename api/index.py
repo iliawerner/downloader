@@ -1,5 +1,7 @@
 """Vercel entrypoint exposing the FastAPI app."""
 
-from downloader.web import app
+from downloader.web import create_app
+
+app = create_app()
 
 __all__ = ["app"]

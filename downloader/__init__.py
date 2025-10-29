@@ -1,9 +1,6 @@
-"""Utilities for inspecting downloadable media streams."""
+"""Public package exports."""
 
-from .streams import get_media_info, StreamInfo, MediaInfo
+from .core import MediaResult, MediaStream
+from .services import MediaService
 
-__all__ = [
-    "get_media_info",
-    "StreamInfo",
-    "MediaInfo",
-]
+__all__ = ["MediaResult", "MediaStream", "MediaService"]
