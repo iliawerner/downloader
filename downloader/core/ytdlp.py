@@ -80,6 +80,14 @@ def _build_default_options() -> Dict[str, Any]:
         # results in metadata mode.  Explicitly opting out keeps the extractor
         # deterministic regardless of the deployment environment.
         "ignoreconfig": True,
+        # Некоторые видео (например, требующие авторизации или с возрастными
+        # ограничениями) могут не иметь форматов, удовлетворяющих выборке
+        # ``bestvideo+bestaudio/best`` по умолчанию. В таком случае yt-dlp
+        # генерирует ``Requested format is not available`` и останавливает
+        # обработку, хотя список ``formats`` уже получен. ``ignore_no_formats_error``
+        # позволяет продолжить выполнение и вернуть метаданные, даже если
+        # ни один формат не выбран для скачивания.
+        "ignore_no_formats_error": True,
         # ``extract_info`` без ``process`` возвращает метаданные для *всех* потоков.
         # Чтобы не ограничивать выдачу и не скрыть доступные потоки, формат не
         # задаётся явно. Это гарантирует, что интерфейс увидит полный список
