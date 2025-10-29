@@ -2,24 +2,232 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Tuple
+import os
+import re
 
 from yt_dlp import YoutubeDL
+from yt_dlp.cookies import SUPPORTED_BROWSERS, SUPPORTED_KEYRINGS
 
 
 class YtDlpExtractor:
     """Thin wrapper around :class:`yt_dlp.YoutubeDL`."""
 
     def __init__(self, **options: Any) -> None:
-        defaults: Dict[str, Any] = {
-            "quiet": True,
-            "no_warnings": True,
-            "skip_download": True,
-        }
-        self._options: Dict[str, Any] = {**defaults, **options}
+        defaults: Dict[str, Any] = _build_default_options()
+        self._options: Dict[str, Any] = {**defaults, **_without(options, "extractor_args")}
+        self._options["extractor_args"] = _merge_extractor_args(
+            defaults.get("extractor_args", {}),
+            options.get("extractor_args", {}),
+        )
 
     def extract(self, url: str) -> Dict[str, Any]:
         """Fetch raw metadata for *url* using ``yt-dlp``."""
 
         with YoutubeDL(self._options) as ydl:
             return ydl.extract_info(url, download=False)
+
+
+def _without(mapping: Mapping[str, Any], *keys: str) -> Dict[str, Any]:
+    return {key: value for key, value in mapping.items() if key not in keys}
+
+
+def _merge_extractor_args(
+    defaults: Dict[str, Dict[str, Any]],
+    overrides: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    merged: Dict[str, Dict[str, Any]] = {
+        extractor: {name: _clone_value(value) for name, value in args.items()}
+        for extractor, args in defaults.items()
+    }
+
+    for extractor, args in overrides.items():
+        target = merged.setdefault(extractor, {})
+        for name, value in args.items():
+            if isinstance(value, list):
+                existing = list(target.get(name, [])) if isinstance(target.get(name), list) else []
+                for item in value:
+                    if item not in existing:
+                        existing.append(item)
+                target[name] = existing
+            else:
+                target[name] = value
+
+    if "youtube" in overrides and "youtubetab" not in overrides and "youtubetab" in merged:
+        tab_args = merged["youtubetab"]
+        for name, value in overrides["youtube"].items():
+            if isinstance(value, list):
+                existing = list(tab_args.get(name, [])) if isinstance(tab_args.get(name), list) else []
+                for item in value:
+                    if item not in existing:
+                        existing.append(item)
+                tab_args[name] = existing
+            else:
+                tab_args.setdefault(name, value)
+
+    return merged
+
+
+def _clone_value(value: Any) -> Any:
+    if isinstance(value, list):
+        return list(value)
+    if isinstance(value, dict):
+        return {key: _clone_value(val) for key, val in value.items()}
+    return value
+
+def _build_default_options() -> Dict[str, Any]:
+    youtube_args: Dict[str, Any] = {}
+
+    po_tokens = _po_tokens_from_env()
+    player_clients = _player_clients_from_env(po_tokens)
+    visitor_data = _visitor_data_from_env()
+
+    if player_clients:
+        youtube_args["player_client"] = player_clients
+    if po_tokens:
+        youtube_args["po_token"] = po_tokens
+    if visitor_data:
+        youtube_args["visitor_data"] = [visitor_data]
+
+    extractor_args: Dict[str, Dict[str, Any]] = {}
+    if youtube_args:
+        extractor_args["youtube"] = _clone_value(youtube_args)
+        extractor_args["youtubetab"] = _clone_value(youtube_args)
+
+    options: Dict[str, Any] = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "extractor_args": extractor_args,
+    }
+
+    options.update(_cookies_options_from_env())
+
+    return options
+
+
+def _po_tokens_from_env() -> List[str]:
+    tokens = _env_list("YT_DLP_PO_TOKEN", "YT_DLP_PO_TOKENS")
+
+    file_tokens = _po_tokens_from_file(os.getenv("YT_DLP_PO_TOKEN_FILE"))
+    if file_tokens:
+        tokens.extend(file_tokens)
+
+    return _unique(tokens)
+
+
+def _po_tokens_from_file(path_str: str | None) -> List[str]:
+    if not path_str:
+        return []
+
+    path = Path(path_str).expanduser()
+    try:
+        contents = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+
+    return [line.strip() for line in contents.splitlines() if line.strip()]
+
+
+def _player_clients_from_env(po_tokens: Iterable[str]) -> List[str]:
+    explicit = _env_list("YT_DLP_PLAYER_CLIENTS", "YT_DLP_PLAYER_CLIENT")
+    if explicit:
+        return _unique(explicit)
+
+    baseline = [
+        "android_sdkless",
+        "android",
+        "android_vr",
+        "ios",
+        "tv",
+    ]
+    if list(po_tokens):
+        clients = ["mweb", *baseline]
+    else:
+        clients = baseline
+    return clients
+
+
+def _visitor_data_from_env() -> str | None:
+    visitor_data = os.getenv("YT_DLP_VISITOR_DATA")
+    if visitor_data:
+        visitor_data = visitor_data.strip()
+    return visitor_data or None
+
+
+def _cookies_options_from_env() -> Dict[str, Any]:
+    options: Dict[str, Any] = {}
+
+    cookiefile = os.getenv("YT_DLP_COOKIES_FILE")
+    if cookiefile:
+        path = Path(cookiefile).expanduser()
+        if path.is_file():
+            options["cookiefile"] = str(path)
+
+    browser_spec = os.getenv("YT_DLP_COOKIES_FROM_BROWSER")
+    if browser_spec:
+        parsed = _parse_cookies_from_browser(browser_spec)
+        if parsed:
+            options["cookiesfrombrowser"] = parsed
+
+    return options
+
+
+_COOKIES_FROM_BROWSER_RE = re.compile(
+    r"""(?x)
+    (?P<name>[^+:]+)
+    (?:\s*\+\s*(?P<keyring>[^:]+))?
+    (?:\s*:\s*(?!:)(?P<profile>.+?))?
+    (?:\s*::\s*(?P<container>.+))?
+    """
+)
+
+
+def _parse_cookies_from_browser(value: str) -> Tuple[str, str | None, str | None, str | None] | None:
+    spec = value.strip()
+    if not spec:
+        return None
+
+    match = _COOKIES_FROM_BROWSER_RE.fullmatch(spec)
+    if not match:
+        return None
+
+    browser_name, keyring, profile, container = match.group(
+        "name", "keyring", "profile", "container"
+    )
+    browser_name = browser_name.lower()
+    if browser_name not in SUPPORTED_BROWSERS:
+        return None
+
+    if keyring is not None:
+        keyring = keyring.upper()
+        if keyring not in SUPPORTED_KEYRINGS:
+            return None
+
+    return browser_name, profile, keyring, container
+
+
+def _env_list(*names: str) -> List[str]:
+    values: List[str] = []
+    for name in names:
+        raw = os.getenv(name)
+        if not raw:
+            continue
+        parts = raw.split(",")
+        for part in parts:
+            item = part.strip()
+            if item:
+                values.append(item)
+    return values
+
+
+def _unique(values: Iterable[str]) -> List[str]:
+    seen: set[str] = set()
+    result: List[str] = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            result.append(value)
+    return result
