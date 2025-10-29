@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, Iterable, Protocol
 
 from ..core import MediaResult, MediaStream, YtDlpExtractor
@@ -27,29 +26,18 @@ class MediaService:
         payload = self._extractor.extract(url, cookies=cookies)
         formats = payload.get("formats") or []
 
-        # --- НАЧАЛО ВРЕМЕННОГО ИЗМЕНЕНИЯ ДЛЯ ДИАГНОСТИКИ ---
+        video_streams = list(self._build_streams(formats, kind="video"))
+        audio_streams = list(self._build_streams(formats, kind="audio"))
 
-        # Мы используем поля title и page_url для вывода отладочной информации
-        # прямо в интерфейс.
+        title = payload.get("title") or ""
+        page_url = payload.get("webpage_url") or url
 
-        debug_title = (
-            f"DEBUG MODE: {len(formats)} formats received from yt-dlp. Click link below for raw data."
-        )
-
-        # Упаковываем весь список форматов в JSON и создаем data-URI.
-        # Это позволит открыть JSON в новой вкладке по клику на ссылку.
-        formats_json = json.dumps(formats, indent=2)
-        debug_page_url = f"data:text/plain;charset=utf-8,{formats_json}"
-
-        # Возвращаем специальный результат с отладочными данными.
         return MediaResult(
-            title=debug_title,
-            page_url=debug_page_url,
-            video_streams=[],
-            audio_streams=[],
+            title=title,
+            page_url=page_url,
+            video_streams=video_streams,
+            audio_streams=audio_streams,
         )
-
-        # --- КОНЕЦ ВРЕМЕННОГО ИЗМЕНЕНИЯ ---
 
     # ------------------------------------------------------------------
     # Internal helpers
