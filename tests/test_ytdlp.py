@@ -171,11 +171,39 @@ def test_extractor_uses_cookie_file_from_env(monkeypatch, tmp_path):
     cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
 
     monkeypatch.setenv("YT_DLP_COOKIES_FILE", str(cookie_file))
+    monkeypatch.delenv("YT_DLP_COOKIES_CONTENT", raising=False)
     extractor = YtDlpExtractor()
     extractor.extract("https://example.com/needs-cookies")
 
     assert captured["options"].get("cookiefile") == str(cookie_file)
     assert "cookiesfrombrowser" not in captured["options"]
+
+
+def test_extractor_writes_cookie_content(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_youtubedl(options):
+        captured["options"] = options
+        return DummyYoutubeDL(options)
+
+    monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
+
+    tmp_cookie_path = Path("/tmp/cookies.txt")
+    if tmp_cookie_path.exists():
+        tmp_cookie_path.unlink()
+
+    monkeypatch.setenv("YT_DLP_COOKIES_CONTENT", "session=abc123")
+    unused_cookie_file = tmp_path / "should_not_be_used.txt"
+    unused_cookie_file.write_text("# unused", encoding="utf-8")
+    monkeypatch.setenv("YT_DLP_COOKIES_FILE", str(unused_cookie_file))
+
+    extractor = YtDlpExtractor()
+    extractor.extract("https://example.com/cookies-content")
+
+    assert captured["options"].get("cookiefile") == str(tmp_cookie_path)
+    assert tmp_cookie_path.read_text(encoding="utf-8") == "session=abc123"
+
+    tmp_cookie_path.unlink(missing_ok=True)
 
 
 def test_extractor_ignores_browser_cookie_spec(monkeypatch):
