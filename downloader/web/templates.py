@@ -212,25 +212,34 @@ INDEX_HTML = """
       }
 
       function renderStreams(title, streams) {
-        if (!streams.length) {
+        const safeStreams = Array.isArray(streams) ? streams : [];
+        if (!safeStreams.length) {
           return `<article class=\"card\"><h2>${title}</h2><p>No streams available.</p></article>`;
         }
         const headers = ['Format', 'MIME Type', 'Resolution', 'Bitrate', 'FPS', 'Filesize', 'Extra', 'Download'];
-        const rows = streams.map((stream) => {
-          const bitrate = stream.bitrate_kbps ? `${stream.bitrate_kbps} kbps` : '—';
-          const fps = stream.fps ?? '—';
-          const size = stream.filesize_bytes ? `${(stream.filesize_bytes / (1024 * 1024)).toFixed(2)} MiB` : '—';
-          const resolution = stream.resolution ?? '—';
-          const extras = stream.extra ? Object.entries(stream.extra).map(([key, value]) => `<div><strong>${escapeHtml(key)}:</strong> ${escapeHtml(String(value))}</div>`).join('') : '—';
+        const rows = safeStreams.map((stream) => {
+          const formatId = typeof stream.format_id === 'string' ? stream.format_id : '—';
+          const mimeType = typeof stream.mime_type === 'string' ? stream.mime_type : '—';
+          const bitrate = typeof stream.bitrate_kbps === 'number' ? `${stream.bitrate_kbps} kbps` : '—';
+          const fps = typeof stream.fps === 'number' ? stream.fps : '—';
+          const size = typeof stream.filesize_bytes === 'number' ? `${(stream.filesize_bytes / (1024 * 1024)).toFixed(2)} MiB` : '—';
+          const resolution = typeof stream.resolution === 'string' ? stream.resolution : '—';
+          const extrasSource = stream.extra && typeof stream.extra === 'object' ? stream.extra : null;
+          const extras = extrasSource
+            ? Object.entries(extrasSource)
+                .map(([key, value]) => `<div><strong>${escapeHtml(key)}:</strong> ${escapeHtml(String(value))}</div>`)
+                .join('')
+            : '—';
+          const downloadUrl = typeof stream.url === 'string' ? stream.url : '#';
           return `<tr>
-            <td>${escapeHtml(stream.format_id)}</td>
-            <td>${escapeHtml(stream.mime_type)}</td>
+            <td>${escapeHtml(formatId)}</td>
+            <td>${escapeHtml(mimeType)}</td>
             <td>${escapeHtml(resolution)}</td>
             <td>${escapeHtml(bitrate)}</td>
             <td>${escapeHtml(String(fps))}</td>
             <td>${escapeHtml(size)}</td>
             <td>${extras}</td>
-            <td><a href=\"${stream.url}\" target=\"_blank\" rel=\"noopener noreferrer\">Download</a></td>
+            <td><a href=\"${escapeHtml(downloadUrl)}\" target=\"_blank\" rel=\"noopener noreferrer\">Download</a></td>
           </tr>`;
         }).join('');
         return `<article class=\"card streams\">
@@ -243,7 +252,8 @@ INDEX_HTML = """
       }
 
       async function lookup(url, cookies) {
-        results.hidden = true;
+        const previousMarkup = results.innerHTML;
+        const hadPreviousResults = !results.hidden;
         status.textContent = '';
         button.disabled = true;
         resetLogs();
@@ -271,15 +281,26 @@ INDEX_HTML = """
             throw new Error(payload.detail || 'Lookup failed');
           }
           const cards = [];
-          const title = payload.title || 'Untitled';
-          cards.push(`<article class=\"card\"><h2>${escapeHtml(title)}</h2><p><a href=\"${payload.page_url}\" target=\"_blank\" rel=\"noopener noreferrer\">Open original page</a></p></article>`);
-          cards.push(renderStreams('Video Streams', payload.video_streams));
-          cards.push(renderStreams('Audio Streams', payload.audio_streams));
+          const title = typeof payload.title === 'string' && payload.title.trim() ? payload.title : 'Untitled';
+          const pageUrl = typeof payload.page_url === 'string' && payload.page_url ? payload.page_url : url;
+          const videoStreams = Array.isArray(payload.video_streams) ? payload.video_streams : [];
+          const audioStreams = Array.isArray(payload.audio_streams) ? payload.audio_streams : [];
+          appendLog('Rendering results', {
+            video_streams: videoStreams.length,
+            audio_streams: audioStreams.length,
+          });
+          cards.push(`<article class=\"card\"><h2>${escapeHtml(title)}</h2><p><a href=\"${escapeHtml(pageUrl)}\" target=\"_blank\" rel=\"noopener noreferrer\">Open original page</a></p></article>`);
+          cards.push(renderStreams('Video Streams', videoStreams));
+          cards.push(renderStreams('Audio Streams', audioStreams));
           results.innerHTML = cards.join('');
           results.hidden = false;
         } catch (error) {
           appendLog('Lookup failed', error?.message || String(error));
           status.innerHTML = `<span class=\"error\">${escapeHtml(error.message || 'Unexpected error')}</span>`;
+          if (hadPreviousResults) {
+            results.innerHTML = previousMarkup;
+            results.hidden = false;
+          }
         } finally {
           button.disabled = false;
         }
