@@ -40,7 +40,8 @@ def test_extractor_sets_expected_player_clients(monkeypatch):
     extractor = YtDlpExtractor()
     result = extractor.extract("https://example.com/video")
 
-    assert result == {"id": "dummy"}
+    assert result["id"] == "dummy"
+    assert "_stream_inspector" in result
     extractor_args = captured["options"]["extractor_args"]
     youtube_args = extractor_args["youtube"]
     tab_args = extractor_args["youtubetab"]
@@ -61,7 +62,7 @@ def test_extractor_requests_raw_metadata(monkeypatch):
     monkeypatch.setattr("downloader.core.ytdlp.YoutubeDL", fake_youtubedl)
 
     extractor = YtDlpExtractor()
-    extractor.extract("https://example.com/no-format")
+    result = extractor.extract("https://example.com/no-format")
 
     options = captured["options"]
     assert "outtmpl" not in options
@@ -74,6 +75,10 @@ def test_extractor_requests_raw_metadata(monkeypatch):
     # yt-dlp must run its full processing pipeline so the ``formats`` entries
     # contain direct stream URLs that can be rendered in the UI.
     assert captured["instance"].recorded_process is True
+
+    inspector = result.get("_stream_inspector") or {}
+    assert inspector.get("yt_dlp_options") == options
+    assert inspector.get("raw_format_count") == 0
 
 
 
@@ -129,10 +134,13 @@ def test_extractor_uses_inline_cookies(monkeypatch):
 
     extractor = YtDlpExtractor()
     cookies = "# Netscape HTTP Cookie File\nfoo\tbar\n"
-    extractor.extract("https://example.com/inline-cookies", cookies=cookies)
+    result = extractor.extract("https://example.com/inline-cookies", cookies=cookies)
 
     cookiefile = captured.get("cookiefile")
     assert cookiefile is not None
     assert captured["cookie_exists_during_call"] is True
     assert captured["cookie_content"] == cookies
     assert not Path(cookiefile).exists()
+
+    inspector = result.get("_stream_inspector") or {}
+    assert inspector.get("yt_dlp_options", {}).get("cookiefile") == "<temporary file>"

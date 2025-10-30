@@ -285,6 +285,9 @@ INDEX_HTML = """
           const pageUrl = typeof payload.page_url === 'string' && payload.page_url ? payload.page_url : url;
           const videoStreams = Array.isArray(payload.video_streams) ? payload.video_streams : [];
           const audioStreams = Array.isArray(payload.audio_streams) ? payload.audio_streams : [];
+          if (payload.debug) {
+            appendLog('Extractor debug summary', payload.debug);
+          }
           appendLog('Rendering results', {
             video_streams: videoStreams.length,
             audio_streams: audioStreams.length,

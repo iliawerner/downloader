@@ -39,6 +39,8 @@ class YtDlpExtractor:
             # Ensure dynamic cookies override any other cookie settings.
             options.pop("cookiesfrombrowser", None)
 
+        sanitized_options = _sanitize_options(options, cookie_path=cookie_path)
+
         try:
             with YoutubeDL(options) as ydl:
                 # ``process=True`` (the default) is required so yt-dlp performs the
@@ -46,12 +48,22 @@ class YtDlpExtractor:
                 # direct stream URLs. Skipping the processing step yields minimal
                 # metadata without usable download links, which results in empty
                 # stream tables on the frontend.
-                return ydl.extract_info(url, download=False)
+                info = ydl.extract_info(url, download=False)
+                info.setdefault(
+                    "_stream_inspector",
+                    {},
+                ).update(
+                    {
+                        "yt_dlp_options": sanitized_options,
+                        "raw_format_count": len(info.get("formats") or []),
+                    }
+                )
+                return info
         except Exception as exc:
             # --- НАЧАЛО ИЗМЕНЕНИЙ ---
             # Если возникает любая ошибка, добавляем к ней отладочную информацию
             # о переданных опциях.
-            debug_info = f"DEBUG_INFO: Options passed to yt-dlp: {options}"
+            debug_info = f"DEBUG_INFO: Options passed to yt-dlp: {sanitized_options}"
             raise type(exc)(f"{str(exc)}\n\n{debug_info}") from exc
             # --- КОНЕЦ ИЗМЕНЕНИЙ ---
         finally:
@@ -103,3 +115,18 @@ def _build_default_options() -> Dict[str, Any]:
     # Note: Environment-based cookie handling is removed from here
     # as dynamic cookies from the UI are now the primary method.
     return options
+
+
+def _sanitize_options(options: Dict[str, Any], *, cookie_path: str | None) -> Dict[str, Any]:
+    """Create a sanitized copy of *options* suitable for logging."""
+
+    sanitized: Dict[str, Any] = {}
+    for key, value in options.items():
+        if key == "cookiefile" and cookie_path:
+            sanitized[key] = "<temporary file>"
+            continue
+        if isinstance(value, set):
+            sanitized[key] = sorted(value)
+            continue
+        sanitized[key] = value
+    return sanitized

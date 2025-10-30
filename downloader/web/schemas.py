@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict
 
 
@@ -23,6 +25,7 @@ class MediaSchema(BaseModel):
     page_url: AnyHttpUrl
     video_streams: list[StreamSchema]
     audio_streams: list[StreamSchema]
+    debug: dict[str, Any] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

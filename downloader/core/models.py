@@ -44,6 +44,7 @@ class MediaResult:
     page_url: str
     video_streams: List[MediaStream]
     audio_streams: List[MediaStream]
+    debug: Dict[str, Any] | None = None
 
     def iter_streams(self) -> Iterable[MediaStream]:
         """Iterate over every stream regardless of media type."""
@@ -59,4 +60,5 @@ class MediaResult:
             "page_url": self.page_url,
             "video_streams": [stream.to_dict() for stream in self.video_streams],
             "audio_streams": [stream.to_dict() for stream in self.audio_streams],
+            "debug": self.debug,
         }
