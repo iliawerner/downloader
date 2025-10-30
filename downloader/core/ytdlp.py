@@ -41,7 +41,12 @@ class YtDlpExtractor:
 
         try:
             with YoutubeDL(options) as ydl:
-                return ydl.extract_info(url, download=False, process=False)
+                # ``process=True`` (the default) is required so yt-dlp performs the
+                # full extraction pipeline which populates the ``formats`` list with
+                # direct stream URLs. Skipping the processing step yields minimal
+                # metadata without usable download links, which results in empty
+                # stream tables on the frontend.
+                return ydl.extract_info(url, download=False)
         except Exception as exc:
             # --- НАЧАЛО ИЗМЕНЕНИЙ ---
             # Если возникает любая ошибка, добавляем к ней отладочную информацию
@@ -59,7 +64,10 @@ def _build_default_options() -> Dict[str, Any]:
     """Builds the base dictionary of options for yt-dlp."""
 
     # Use a variety of clients to mimic real devices, reducing the chance of blocks.
-    player_clients = ["android", "mweb", "tv"]
+    # The "web" client must be included so yt-dlp can retrieve the JavaScript
+    # player needed to decipher signature ciphers and expose direct stream URLs.
+    # Without it, some videos only return metadata without populated ``formats``.
+    player_clients = ["web", "android", "mweb", "tv"]
     extractor_args: Dict[str, Dict[str, Any]] = {
         "youtube": {"player_client": player_clients},
         "youtubetab": {"player_client": player_clients},
@@ -69,12 +77,26 @@ def _build_default_options() -> Dict[str, Any]:
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
-        "format": "bv*+ba/b",  # Гибкий селектор для получения всех данных
-        # Используем явные шаблоны, чтобы yt-dlp не переключался в режим скачивания.
-        "outtmpl": {
-            "default": "-",
-            "chapter": "-",
-        },
+        # ``ignoreconfig`` disables reading the user's yt-dlp configuration
+        # files.  When third-party configs provide values such as ``format`` or
+        # ``outtmpl`` they can constrain the available streams or cause empty
+        # results in metadata mode.  Explicitly opting out keeps the extractor
+        # deterministic regardless of the deployment environment.
+        "ignoreconfig": True,
+        # Некоторые видео (например, требующие авторизации или с возрастными
+        # ограничениями) могут не иметь форматов, удовлетворяющих выборке
+        # ``bestvideo+bestaudio/best`` по умолчанию. В таком случае yt-dlp
+        # генерирует ``Requested format is not available`` и останавливает
+        # обработку, хотя список ``formats`` уже получен. ``ignore_no_formats_error``
+        # позволяет продолжить выполнение и вернуть метаданные, даже если
+        # ни один формат не выбран для скачивания.
+        "ignore_no_formats_error": True,
+        # Serverless providers such as Vercel frequently disallow outgoing HEAD requests or strip cookies from them. yt-dlp validates every format by issuing HEAD probes when ``check_formats`` is enabled which causes the extractor to discard otherwise valid stream URLs. Disabling the check preserves the raw ``formats`` data so the UI can still present options.
+        "check_formats": False,
+        # ``extract_info`` без ``process`` возвращает метаданные для *всех* потоков.
+        # Чтобы не ограничивать выдачу и не скрыть доступные потоки, формат не
+        # задаётся явно. Это гарантирует, что интерфейс увидит полный список
+        # вариантов и не отобразит «No streams available».
         "extractor_args": extractor_args,
     }
 

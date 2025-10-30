@@ -45,7 +45,7 @@ def test_extractor_sets_expected_player_clients(monkeypatch):
     youtube_args = extractor_args["youtube"]
     tab_args = extractor_args["youtubetab"]
 
-    assert youtube_args["player_client"] == ["android", "mweb", "tv"]
+    assert youtube_args["player_client"] == ["web", "android", "mweb", "tv"]
     assert tab_args["player_client"] == youtube_args["player_client"]
 
 
@@ -64,15 +64,16 @@ def test_extractor_requests_raw_metadata(monkeypatch):
     extractor.extract("https://example.com/no-format")
 
     options = captured["options"]
-    assert options.get("outtmpl") == {"default": "-", "chapter": "-"}
+    assert "outtmpl" not in options
     assert options.get("format") is None
-    assert "check_formats" not in options
-    assert "ignore_no_formats_error" not in options
+    assert options.get("ignoreconfig") is True
+    assert options.get("ignore_no_formats_error") is True
+    assert options.get("check_formats") is False
     assert options.get("extractor_args") is not None
 
-    # ``process=False`` гарантирует, что yt-dlp не будет выполнять подбор форматов,
-    # благодаря чему возвращается полный список потоков.
-    assert captured["instance"].recorded_process is False
+    # yt-dlp must run its full processing pipeline so the ``formats`` entries
+    # contain direct stream URLs that can be rendered in the UI.
+    assert captured["instance"].recorded_process is True
 
 
 
