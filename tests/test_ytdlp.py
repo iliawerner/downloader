@@ -68,7 +68,7 @@ def test_extractor_requests_raw_metadata(monkeypatch):
     assert options.get("format") is None
     assert options.get("ignoreconfig") is True
     assert options.get("ignore_no_formats_error") is True
-    assert "check_formats" not in options
+    assert options.get("check_formats") is False
     assert options.get("extractor_args") is not None
 
     # yt-dlp must run its full processing pipeline so the ``formats`` entries

@@ -91,6 +91,8 @@ def _build_default_options() -> Dict[str, Any]:
         # позволяет продолжить выполнение и вернуть метаданные, даже если
         # ни один формат не выбран для скачивания.
         "ignore_no_formats_error": True,
+        # Serverless providers such as Vercel frequently disallow outgoing HEAD requests or strip cookies from them. yt-dlp validates every format by issuing HEAD probes when ``check_formats`` is enabled which causes the extractor to discard otherwise valid stream URLs. Disabling the check preserves the raw ``formats`` data so the UI can still present options.
+        "check_formats": False,
         # ``extract_info`` без ``process`` возвращает метаданные для *всех* потоков.
         # Чтобы не ограничивать выдачу и не скрыть доступные потоки, формат не
         # задаётся явно. Это гарантирует, что интерфейс увидит полный список
