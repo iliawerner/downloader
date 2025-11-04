@@ -24,7 +24,7 @@ class MediaService:
         """Retrieve structured metadata for *url*."""
 
         payload = self._extractor.extract(url, cookies=cookies)
-        formats = payload.get("formats") or []
+        formats = list(payload.get("formats") or [])
 
         video_streams = list(self._build_streams(formats, kind="video"))
         audio_streams = list(self._build_streams(formats, kind="audio"))
@@ -32,11 +32,14 @@ class MediaService:
         title = payload.get("title") or ""
         page_url = payload.get("webpage_url") or url
 
+        debug = self._build_debug(payload, formats)
+
         return MediaResult(
             title=title,
             page_url=page_url,
             video_streams=video_streams,
             audio_streams=audio_streams,
+            debug=debug or None,
         )
 
     # ------------------------------------------------------------------
@@ -111,6 +114,37 @@ class MediaService:
         if resolution:
             return str(resolution)
         return None
+
+    @staticmethod
+    def _build_debug(payload: Dict[str, Any], formats: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+        """Create a structured debug summary for the frontend."""
+
+        formats_list = list(formats)
+        inspector_meta = payload.get("_stream_inspector") or {}
+
+        debug: Dict[str, Any] = {
+            "raw_format_count": len(formats_list),
+            "raw_formats_with_url": sum(1 for fmt in formats_list if "url" in fmt),
+        }
+
+        if inspector_meta:
+            debug["yt_dlp_options"] = inspector_meta.get("yt_dlp_options")
+            if inspector_meta.get("raw_format_count") is not None:
+                debug.setdefault("raw_format_count", inspector_meta["raw_format_count"])
+
+        format_ids = [
+            str(fmt.get("format_id") or fmt.get("format") or "")
+            for fmt in formats_list
+            if fmt.get("format_id") or fmt.get("format")
+        ][:25]
+        if format_ids:
+            debug["raw_format_ids"] = format_ids
+
+        for key in ("is_live", "was_live", "live_status"):
+            if key in payload:
+                debug[key] = payload[key]
+
+        return {k: v for k, v in debug.items() if v not in (None, [], {})}
 
     @staticmethod
     def _build_bitrate(fmt: Dict[str, Any]) -> int | None:
